@@ -1,0 +1,16 @@
+{
+  "name": "lazy-cooking",
+  "private": true,
+  "version": "1.0.0",
+  "description": "One-person Indian(+) meal-prep decision engine. Mobile-first PWA.",
+  "scripts": {
+    "build": "bash build.sh"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
