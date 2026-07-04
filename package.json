@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "description": "One-person Indian(+) meal-prep decision engine. Mobile-first PWA.",
   "scripts": {
-    "build": "bash build.sh"
+    "build": "node build.mjs",
+    "serve": "node serve.mjs",
+    "start": "node build.mjs && node serve.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

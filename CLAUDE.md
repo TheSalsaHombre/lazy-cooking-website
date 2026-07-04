@@ -31,7 +31,8 @@ One user, one kitchen. Resist generalising it.
 ```
 src/app.jsx              — the entire app (one file, on purpose)
 public/                  — static shell: index.html, manifest, sw.js, icons
-build.sh                 — esbuild bundle + copy public/* → dist/
+build.mjs                — esbuild bundle + copy public/* → dist/ (cross-platform)
+serve.mjs                — zero-dependency local static server (npm run serve)
 package.json             — react, react-dom, esbuild only. Keep it that way.
 .github/workflows/deploy.yml — build + deploy to GitHub Pages on push to main
 CLAUDE.md                — this file
@@ -46,8 +47,14 @@ it genuinely exceeds ~2.5k lines.
 
 ```
 npm install        # once (also refreshes package-lock.json — commit it)
-bash build.sh      # → dist/  (esbuild, --jsx=automatic, minified)
+npm run build      # → dist/  (build.mjs: esbuild bundle + copy public/*)
+npm start          # build + serve locally at http://localhost:8000
 ```
+
+Build is `build.mjs` (Node, cross-platform — no bash) and the local server
+is `serve.mjs` (zero-dependency). The GitHub Actions workflow runs
+`npm run build`. If you add a build step, put it in `build.mjs`, not a shell
+script, so Windows contributors and the CI runner stay in sync.
 
 Smoke test after any change (this is the CI-equivalent; there is no test
 framework by design):
