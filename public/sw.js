@@ -1,6 +1,6 @@
 // Lazy Cooking service worker.
 // network-first for the app shell (so deploys propagate), cache-first for static assets/fonts.
-const CACHE = 'lazy-cooking-v1';
+const CACHE = 'lazy-cooking-v2';
 const CORE = ['./', './index.html', './app.js', './manifest.webmanifest', './icon.svg', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

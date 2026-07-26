@@ -1,11 +1,12 @@
 # Lazy Cooking Website
 
-One-person Indian(+) meal-prep decision engine. A mobile-first web app (PWA)
-that answers "what do I cook tonight?" from your energy level and freezer
-state, and runs the batch-cooking system around it.
+One-person Indian(+) meal decision engine. A mobile-first web app (PWA) that
+answers "what do I cook tonight?" from your energy level and what's in the
+fridge. No freezer: one batched main covers 2–3 fridge nights, fresh quick
+dishes fill the rest.
 
 Everything is client-side. No backend, no accounts — your data lives in the
-browser's localStorage (backup/restore built in, Freezer tab → Your data).
+browser's localStorage (backup/restore built in, Kitchen tab → Your data).
 
 ---
 
@@ -148,7 +149,7 @@ You get a full-screen app with the flame icon that works offline after the
 first load.
 
 localStorage is **per browser, per device** — the home-screen app has its
-own storage separate from Safari. Use Download/Copy backup (Freezer tab →
+own storage separate from Safari. Use Download/Copy backup (Kitchen tab →
 Your data) before switching devices or hosts.
 
 ---
@@ -164,14 +165,17 @@ Your data) before switching devices or hosts.
   built-ins; edits show an `edited` badge and can be reset. Mark dishes
   **✓ tried & true** — at low flame the engine ranks those above experiments
   — and log tweaks in **field notes**.
-- **Prep day** — four plans for four kinds of weekend, Instant Pot + stove as
-  parallel lanes. "+ Week plan" on any recipe builds the merged **shopping
-  list** here.
-- **Freezer** — the counters that drive Tonight. Update when you batch and
-  when you raid. **Your data** section: backup, restore, reset.
+- **Kitchen** — build **this week's plan** ("+ Week plan" on any recipe) and
+  the merged **shopping list** assembles itself. **Your data** section:
+  backup, restore, reset.
 
-First move after deploying: run the **Full Sunday** plan once. It stocks the
-frozen base + dal portions that every fast weeknight depends on.
+Fridge inventory (base jar, cooked dal, leftover rice, eggs, paneer, fresh
+veg) lives as toggles at the top of **Tonight** — flip them as you cook and
+shop, and the suggestions re-sort.
+
+First move after deploying: on a lazy Sunday, cook the **Small bhuna masala
+base** and a **dal batch** into the fridge — the two staples that make the
+gravy and dal families fast for the next few nights.
 
 ---
 
@@ -182,6 +186,6 @@ rules, recipe-authoring rules, verified cooking constants with sources. From
 the repo folder:
 
 ```
-claude "add a beef rendang recipe to the coconut family"
+claude "add a beef rendang recipe to the global family"
 claude "the tehri came out wet — check the water ratio against sources"
 ```

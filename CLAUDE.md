@@ -4,22 +4,29 @@ Context file for AI-assisted maintenance. Read this fully before changing anythi
 
 ## What this is
 
-A one-person Indian(+) meal-prep decision engine for VK. Mobile-first PWA,
+A one-person Indian(+) meal decision engine for VK. Mobile-first PWA,
 installed via Add to Home Screen on an iPhone. It answers one question well —
-"what do I cook tonight, given my energy and what's in the freezer?" — and
-supports the batch-cooking system around it.
+"what do I cook tonight, given my energy and what's in the fridge?"
+
+**No freezer.** VK has little freezer space, so the app deliberately does not
+run a freeze-portions meal-prep system. The loop is **hybrid**: one batched
+main covers 2–3 fridge nights (eaten within 3–4 days), and fresh quick
+single-serve dishes fill the rest of the week. Variety over big-batch
+repetition. (History: v1–v3 were built around a freezer of portioned base /
+dal / meals; v4 removed all of it. See Persistence for the migration.)
 
 **This is a personal tool, not a product.** No accounts, no sync, no backend.
 One user, one kitchen. Resist generalising it.
 
 ## The user (design constraints, not biography)
 
-- Cooks Indian food; strong on onion–tomato gravies. Batch-cooks Sunday
-  (Saturday if spending Sunday in London); one main = 3–4 dinners; 4–5 home
-  dinners/week.
+- Cooks Indian food; strong on onion–tomato gravies. Cooks 4–5 home
+  dinners/week: a batched main (covers 2–3 nights from the fridge) plus fresh
+  quick dishes on the other nights.
 - Kit: Instant Pot, stove, oven, blender, microwave. **No air fryer.**
 - Lives alone in the UK → solo-perishable waste is a hard constraint (see
-  recipe rules).
+  recipe rules). No freezer buffer, so fridge shelf-life (~3–4 days for cooked
+  mains) is the real limit; don't author dishes that assume day-5 portions.
 - Nutrition goal: **recomp** (lose fat, build muscle). Breakfast ≈ banana,
   lunch = sandwich → **dinner carries the day**. Protein floor ~35 g/dinner.
   Uses cauliflower rice but wants real rice when justified (portioned, paired
@@ -77,25 +84,32 @@ mount call guards `typeof document`. Keep it that way or the smoke test dies.
 
 ## Persistence (the part you must not break)
 
-Single localStorage key `lazy-cooking`, JSON blob:
+Single localStorage key `lazy-cooking`, JSON blob (schema v4):
 
 ```js
-{ schemaVersion: 3,
-  freezer: { base, dal, rice, meals, cauliRice, spinach, peas },  // ints
-  fridge:  { eggs, paneer, shopped, rice },                        // bools
+{ schemaVersion: 4,
+  fridge:  { base, dal, rice, eggs, paneer, shopped },  // all bools — "what's in"
   customRecipes: [Recipe],        // user's own, id "custom-<ts36>"
   overrides: { [builtinId]: fields },  // user edits to built-ins, merged at load
   flags:     { [recipeId]: { tried: bool, notes: string } },
   weekPlan:  [recipeId] }
 ```
 
+The six `fridge` booleans are the entire inventory model: `base` (a base jar
+in the fridge), `dal` (a cooked dal pot), `rice` (leftover rice), plus `eggs`,
+`paneer`, `shopped` (fresh veg/meat in). These are the six `needs` keys too.
+
 Rules:
-- **Migrations are additive only.** Bump `SCHEMA_VERSION`, extend `migrate()`
-  to default new fields, never drop or rename user data. The user's field
-  notes and custom recipes are the most valuable data in the app.
+- **Migrations preserve user data; renames must remap, not drop.** v4 removed
+  the `freezer` object and the v1–v3 need keys `frozenBase`/`frozenDal`/
+  `frozenRice`. `migrate()` folds any old freezer count >0 into the matching
+  `fridge` boolean, and remaps those need keys (`NEED_REMAP`) inside stored
+  `customRecipes` and `overrides`. **Never drop field notes or custom recipes**
+  — they're the most valuable data in the app. Bump `SCHEMA_VERSION` and extend
+  `migrate()` for any future change.
 - `migrate()` must accept any historical shape (including hand-edited JSON
-  pasted into Import) and return a valid current-shape state.
-- Export/Import (Freezer tab → Your data) round-trips the whole blob and is
+  pasted into Import, and old freezer-era backups) and return valid v4 state.
+- Export/Import (Kitchen tab → Your data) round-trips the whole blob and is
   the user's backup + host-migration path. Never break it.
 
 ## Recipe data model
@@ -103,50 +117,66 @@ Rules:
 ```js
 { id, name, tier: 0|1|2, time: minutes, concept: key of CONCEPTS,
   known: bool,                 // user already cooks this (kills "new skill" badge)
-  needs: subset of [frozenBase, frozenDal, frozenRice, eggs, paneer, shopped],
-  makes: string,               // "3–4 dinners" etc.
+  needs: subset of [base, dal, rice, eggs, paneer, shopped],
+  makes: string,               // "3 dinners", "1–2 nights" etc.
   shop: [string],              // whole-UK-pack units, pantry excluded
   ingredients: [string], steps: [string],   // optional (metadata-only allowed)
-  note, leftover, pairHint: string,
+  hook, note, leftover, pairHint: string,
   balance: { p, v, c: 0–2 } }  // protein/veg/carb dots, plate-as-presented
 ```
 
 `needs: []` means pantry-only. The pantry is: rice, dals, besan, canned
 chickpeas & tomatoes, yogurt, spices, onions, garlic, **ginger-garlic paste**
-(user always stocks it — never list it as shopping), potatoes, frozen peas.
+(user always stocks it — never list it as shopping), potatoes, and **one
+standing bag of frozen peas** (the sole freezer concession — a bag, not a
+meal-prep system). Poha, tamarind, sambar powder, and jar pastes (Thai,
+doubanjiang) become pantry once bought — route the remainder in `note`.
+The `base` and `dal` needs are fridge staples the user batches (small base
+jar keeps 2–3 days; plain dal keeps 2–3 days, tadka added fresh per night).
 
 ## Engine rules
 
 - Flame tiers: 0 = ≤20 min no chopping (green), 1 = 25–45 min one pan + IP
-  (turmeric), 2 = prep-day (chili). Tonight shows `tier <= flame`.
+  (turmeric), 2 = bigger weekend cook (chili). Tonight shows `tier <= flame`.
 - **No hard availability filter.** Two groups: "Cook from what's in"
   (needs met) and "Worth a shop — or 20 extra minutes" (missing needs shown
   as chips; `kind: "shop"` → red, `kind: "time"` → amber substitutable).
-- Scoring: tier match +3, uses frozen base/dal +3, combo +2. **Flame 0
-  boosts tried:true (+2)** — exhausted nights get known-good; **flame ≥1
-  nudges untested** (+1) — arsenal expansion happens when there's energy.
-- `concept: "batch"` recipes never appear in Tonight.
+  `base`/`dal`/`rice` are `time` (substitutable by cooking from scratch);
+  `eggs`/`paneer`/`shopped` are `shop`.
+- Scoring: tier match +3, uses fridge staple `base`/`dal` +3, combo +2.
+  **Flame 0 boosts tried:true (+2)** — exhausted nights get known-good;
+  **flame ≥1 nudges untested** (+1) — arsenal expansion happens when there's
+  energy.
+- `concept: "batch"` recipes (the small base + dal pots) never appear in
+  Tonight; they're enablers, shown only in Arsenal.
 - Balance dots render on every card; `pairHint` shows on Tonight cards when
   `balance.p < 2` (protein-assertive nudges toward the 35 g floor).
 
 ## Recipe authoring rules (apply to every new/edited entry)
 
-1. Mains = 3–4 dinners. Portion 3 to the fridge, **freeze the rest on cook
-   day** — weekends are unpredictable, day-4 portions never gamble.
+1. **No freezing, ever.** Mains portion to the fridge and must be eaten within
+   ~3–4 days, so size mains at 2–4 dinners (not "freeze the rest"). Shorter-
+   shelf-life proteins (fish) get flagged "eat first". Fresh quick single-
+   serve dishes (1–2 nights) fill the other nights — the hybrid loop.
 2. **Whole-UK-pack quantities** (2 × 300 g mushroom packs, whole cauliflower,
    1 kg chicken thighs, whole 400 ml coconut tin, 225 g paneer packs).
    No "half a pepper" unless the remainder is routed.
 3. Durable-veg bias (cabbage, carrots, cauliflower). Fragile veg only in
    recipes consuming the full pack in one cook.
-4. Freezer-native forms for the fragile four: spinach, coriander, green
-   chilies, bread.
+4. **Fragile items are fresh now** (no freezer): spinach used whole per cook
+   (palak paneer, dal palak = 1–2 bags in one go); coriander, green chilies,
+   bread all fresh. Frozen peas are the one exception (a standing bag).
 5. `leftover` field routes any partial pack ("½ pot yogurt → raita Thursday").
    Yogurt always gets an exit (kadhi / raita / curd rice / marinade).
 6. Protein floor ~35 g via the dish or its `pairHint`. Paneer flagged
-   calorie-dense, not a default protein.
+   calorie-dense, not a default protein. High-protein mains (keema, mapo,
+   oyakodon, fish, tikka, butter chicken) are a deliberate lane for recomp.
 7. Techniques must fit the kit (IP/stove/oven/blender). No air fryer.
-8. New dishes should extend an existing family (CONCEPTS) — arsenal expansion
-   via familiar technique is the product thesis.
+   Prefer stovetop/oven for new dishes so you're not inventing unsourced
+   pressure timings; reuse the verified rice/dal constants when you do use IP.
+8. New dishes should extend an existing family (CONCEPTS). Non-Indian dishes
+   live in `global` ("Global one-pans" — a jar/tin/soy does the base-building).
+   Arsenal expansion via familiar technique is the product thesis.
 
 ## Verified constants (don't "fix" these without re-sourcing)
 
@@ -154,7 +184,7 @@ chickpeas & tomatoes, yogurt, spices, onions, garlic, **ginger-garlic paste**
 |---|---|---|
 | Rajma, soaked overnight | HP 30 min + NR; ~1.5–3 cups water / cup beans | pipingpotcurry.com, indianveggiedelight.com, masalachilli.com |
 | Dal makhani, soaked | HP 30 min + NR (45+ only unsoaked); ~3–4 cups water / 1⅓ cups legumes | ministryofcurry.com, pipingpotcurry.com, culinaryshades.com |
-| Tehri / veg pulao | rinsed basmati ~1:1.5 water (reduce ~¼ cup with frozen veg); HP 5 + **NR 10** (NR keeps grains separate) | indianveggiedelight.com, pipingpotcurry.com, petitepaprika.com |
+| Tehri / veg pulao | rinsed basmati ~1:1.5 water (reduce ~¼ cup for moist veg, e.g. thawing peas); HP 5 + **NR 10** (NR keeps grains separate) | indianveggiedelight.com, pipingpotcurry.com, petitepaprika.com |
 | Plain basmati | 1:1¼, HP 4, NR 10 | standard |
 | Khichdi | rice+moong equal, ~3.3× water, HP 8, NR 10 | standard |
 | Toor/moong dal | HP 10 + NR | standard |
@@ -192,6 +222,6 @@ comment. The user will catch an unsourced wrong number.
 ## Adding features — the bar
 
 Before adding anything, ask: does it help decide tonight's dinner, run a
-prep day, or keep the freezer honest? If not, it's scope creep. The user
+batch a main for the week, or keep the fridge honest? If not, it's scope creep. The user
 prefers options to evaluate over prescriptive single answers, and will push
 back on unsupported claims — cite sources for any cooking constant.
